@@ -78,8 +78,11 @@ def get_or_create_album(album_title, session):
 
     # No albums found. Create new.
     logging.info("Creating new album: '%s'" % album_title)
-    
-    
+    r = session.post('https://photoslibrary.googleapis.com/v1/albums', json={"album": {"title": album_title}})
+    logging.debug("Create album response: {}".format(r.text))
+    r.raise_for_status()
+    return r.json()
+
 def upload_album(flickr_album, fs_cache, session):
     # get or create google album
     # Add enrichment as description.
