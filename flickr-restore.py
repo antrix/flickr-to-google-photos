@@ -65,8 +65,9 @@ def get_authorized_session(client_secrets_file, auth_token_file):
 
 
 class PhotoUploader:
-    def __init__(self, flickr_albums_json, fs_cache, session):
+    def __init__(self, flickr_albums_json, flickr_photo_json_dir, fs_cache, session):
         self.flickr_albums_json = flickr_albums_json
+        self.flickr_photo_json_dir = flickr_photo_json_dir
         self.fs_cache = fs_cache
         self.session = session
 
@@ -120,6 +121,18 @@ class PhotoUploader:
         r.raise_for_status()
         return r.json()
 
+    def get_flickr_photo_description(self, photo_id):
+        photo_json_file = os.path.join(self.flickr_photo_json_dir, "photo_%s.json" % photo_id)
+        try:
+            with open(photo_json_file, "r") as json_file:
+                photo_json = json.load(json_file)
+                description = "\n\n".join(filter(len, (photo_json["name"], photo_json["description"])))
+                return description
+        except Exception as err:
+            logging.warn("Could not find photo json file: {}".format(photo_json_file))
+            logging.warn("Exception was: {}".format(err))
+            return None
+
     def upload_photo(self, flickr_photo_id, google_album_id):
         flickr_photo_fspath = self.fs_cache[flickr_photo_id]
         logging.info("Uploading photo: '%s: %s'" % (flickr_photo_id, flickr_photo_fspath))
@@ -139,7 +152,7 @@ class PhotoUploader:
             "albumId": google_album_id,
             "newMediaItems": [
                 {
-                    "description": "TODO: add real description",
+                    "description": self.get_flickr_photo_description(flickr_photo_id),
                     "simpleMediaItem": {"uploadToken": upload_token}
                 }
             ]}
@@ -153,7 +166,8 @@ def main():
 
     session = get_authorized_session("c:\\media\\flickr-restore\\credentials.json", "c:\\media\\flickr-restore\\auth-token.json")
 
-    uploader = PhotoUploader("c:\\media\\flickr-restore\\test-albums.json", fs_cache, session)
+    uploader = PhotoUploader("c:\\media\\flickr-restore\\test-albums.json", "c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1",
+                             fs_cache, session)
     uploader.upload_all_albums()
 
 
