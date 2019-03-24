@@ -59,6 +59,32 @@ def get_authorized_session(client_secrets_file, auth_token_file):
     save_credentials(creds, auth_token_file)
     return session
 
+def upload_photo(flickr_photo_id, google_album_id, fs_cache, session):
+    flickr_photo_fspath = fs_cache[flickr_photo_id]
+    logging.info("Uploading photo: '%s: %s'" % (flickr_photo_id, flickr_photo_fspath))
+
+    upload_token = None
+    with open(flickr_photo_fspath, 'rb') as f:
+        headers = {
+            "X-Goog-Upload-File-Name": os.path.basename(flickr_photo_fspath),
+            "X-Goog-Upload-Protocol": "raw"
+        }
+        resp = session.post("https://photoslibrary.googleapis.com/v1/uploads", data=f, headers=headers)
+        resp.raise_for_status()
+        upload_token = resp.text
+        logging.debug("Received upload token: %s" % upload_token)
+
+    create_request_body = { 
+                "albumId": google_album_id,
+                "newMediaItems": [
+                {
+                "description": "TODO: add real description",
+                "simpleMediaItem": { "uploadToken": upload_token }
+                }
+            ]}
+
+    session.post("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", json=create_request_body).raise_for_status()
+
 def get_or_create_album(album_title, session):
     
     params = {'excludeNonAppCreatedData': True}
@@ -100,6 +126,8 @@ def upload_album(flickr_album, fs_cache, session):
 
     logging.info("Starting upload of photos to: '%s'" % album["title"])
 
+    for flickr_photo_id in flickr_album["photos"]:
+        upload_photo(flickr_photo_id, album["id"], fs_cache, session)
 
 def upload_all_albums(flickr_albums_json, fs_cache, session):
     with open(flickr_albums_json, "r") as json_file:
@@ -114,8 +142,7 @@ def main():
 
     session = get_authorized_session("c:\\media\\flickr-restore\\credentials.json", "c:\\media\\flickr-restore\\auth-token.json")
 
-    upload_all_albums(
-        "c:\\media\\flickr-restore\\test-albums.json", fs_cache, session)
+    upload_all_albums("c:\\media\\flickr-restore\\test-albums.json", fs_cache, session)
 
 
 if __name__ == '__main__':
