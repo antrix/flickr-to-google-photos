@@ -93,9 +93,15 @@ class PhotoUploader:
             raise SystemExit
 
         logging.info("Starting upload of photos to: '%s'" % album["title"])
+        
+        cover_photo_id = flickr_album["cover_photo"].rpartition("/")
+        if cover_photo_id[1] == "/":
+            cover_photo_id = cover_photo_id[2]
+        else:
+            cover_photo_id = None
 
         for flickr_photo_id in flickr_album["photos"]:
-            self.upload_photo(flickr_photo_id, album["id"])
+            self.upload_photo(flickr_photo_id, album["id"], flickr_photo_id == cover_photo_id)
 
     def get_or_create_album(self, flickr_album):
 
@@ -152,7 +158,7 @@ class PhotoUploader:
             logging.warn("Exception was: {}".format(err))
             return None
 
-    def upload_photo(self, flickr_photo_id, google_album_id):
+    def upload_photo(self, flickr_photo_id, google_album_id, is_cover_photo):
         flickr_photo_fspath = self.fs_cache[flickr_photo_id]
         logging.info("Uploading photo: '%s: %s'" % (flickr_photo_id, flickr_photo_fspath))
 
@@ -175,6 +181,9 @@ class PhotoUploader:
                     "simpleMediaItem": {"uploadToken": upload_token}
                 }
             ]}
+        
+        if is_cover_photo:
+            create_request_body["albumPosition"] = {"position": "FIRST_IN_ALBUM"}
 
         self.session.post("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", json=create_request_body).raise_for_status()
 
