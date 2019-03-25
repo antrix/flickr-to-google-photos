@@ -15,7 +15,7 @@ def build_fs_cache(root_folder):
     ID_PATTERN_1 = re.compile(r".*_(\d+)_o.(?:jpg|png|gif)$")
     ID_PATTERN_2 = re.compile(r"(\d+)_.*_o.(?:jpg|png|gif)$")
 
-    for dirpath, dirnames, filenames in os.walk(root_folder):
+    for dirpath, _, filenames in os.walk(root_folder):
         for name in filenames:
             count = count + 1
             file_path = os.path.join(dirpath, name)
@@ -86,7 +86,7 @@ class PhotoUploader:
         #   2. upload the rest of the photos with description and add to album
         logging.info("Going to upload: '%s'" % flickr_album["title"])
 
-        album = self.get_or_create_album(flickr_album["title"])
+        album = self.get_or_create_album(flickr_album)
 
         if not album or not album["title"]:
             logging.error("Failed to create album. Exiting.")
@@ -97,7 +97,7 @@ class PhotoUploader:
         for flickr_photo_id in flickr_album["photos"]:
             self.upload_photo(flickr_photo_id, album["id"])
 
-    def get_or_create_album(self, album_title):
+    def get_or_create_album(self, flickr_album):
 
         params = {'excludeNonAppCreatedData': True}
 
@@ -105,7 +105,7 @@ class PhotoUploader:
             albums = self.session.get('https://photoslibrary.googleapis.com/v1/albums', params=params).json()
             logging.debug("Retrieved album list: %s" % albums)
             for album in albums.get("albums", []):
-                if album["title"].lower() == album_title.lower():
+                if album["title"].lower() == flickr_album["title"].lower():
                     logging.debug("Found existing album: %s" % album)
                     return album
 
@@ -115,11 +115,30 @@ class PhotoUploader:
                 break
 
         # No albums found. Create new.
-        logging.info("Creating new album: '%s'" % album_title)
-        r = self.session.post('https://photoslibrary.googleapis.com/v1/albums', json={"album": {"title": album_title}})
+        logging.info("Creating new album: '%s'" % flickr_album["title"])
+        r = self.session.post("https://photoslibrary.googleapis.com/v1/albums", json={"album": {"title": flickr_album["title"]}})
         logging.debug("Create album response: {}".format(r.text))
         r.raise_for_status()
-        return r.json()
+        google_album = r.json()
+
+        if flickr_album["description"]:
+            self.set_album_description(google_album["id"], flickr_album["description"])
+
+        return google_album
+
+    def set_album_description(self, google_album_id, description):
+        enrich_req_body = {
+            "newEnrichmentItem": {
+                "textEnrichment": {
+                    "text": description
+                }
+            },
+            "albumPosition": {
+                "position": "FIRST_IN_ALBUM"
+            }
+        }
+        r = self.session.post("https://photoslibrary.googleapis.com/v1/albums/%s:addEnrichment" % google_album_id, json=enrich_req_body)
+        logging.debug("Enrich album response: {}".format(r.text))
 
     def get_flickr_photo_description(self, photo_id):
         photo_json_file = os.path.join(self.flickr_photo_json_dir, "photo_%s.json" % photo_id)
