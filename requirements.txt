@@ -1,1 +1,2 @@
 google-auth-oauthlib>=0.3.0
+piexif>=1.1.2
