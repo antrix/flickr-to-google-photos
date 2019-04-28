@@ -1,0 +1,11 @@
+{
+    "python.pythonPath": "venv\\Scripts\\python.exe",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "python.formatting.autopep8Args": [
+        "--max-line-length=160"
+    ],
+    "python.linting.pep8Args": [
+        "--max-line-length=160"
+    ]
+}
