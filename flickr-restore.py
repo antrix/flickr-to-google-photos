@@ -8,30 +8,7 @@ from google.auth.transport.requests import AuthorizedSession
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-
-def build_fs_cache(root_folder):
-    cache = {}
-    count = 0
-    ID_PATTERN_1 = re.compile(r".*_(\d+)_o.(?:jpg|png|gif)$")
-    ID_PATTERN_2 = re.compile(r"(\d+)_.*_o.(?:jpg|png|gif)$")
-
-    for dirpath, _, filenames in os.walk(root_folder):
-        for name in filenames:
-            count = count + 1
-            file_path = os.path.join(dirpath, name)
-
-            for pattern in (ID_PATTERN_1, ID_PATTERN_2):
-                match = re.match(pattern, name.lower())
-                if match and match.lastindex == 1:
-                    cache[match.group(1)] = file_path
-                    break
-            else:
-                logging.warn("Could not process: %s" % file_path)
-
-    logging.debug("Processed %d files" % count)
-    logging.debug("Parsed %d photo identifiers" % len(cache))
-    return cache
-
+from flickr import FlickrHelper
 
 def save_credentials(creds, auth_token_file):
     creds_dict = {
@@ -65,25 +42,15 @@ def get_authorized_session(client_secrets_file, auth_token_file):
 
 
 class PhotoUploader:
-    def __init__(self, flickr_albums_json, flickr_photo_json_dir, fs_cache, session):
-        self.flickr_albums_json = flickr_albums_json
-        self.flickr_photo_json_dir = flickr_photo_json_dir
-        self.fs_cache = fs_cache
+    def __init__(self, flickr, session):
+        self.flickr = flickr
         self.session = session
 
     def upload_all_albums(self):
-        with open(self.flickr_albums_json, "r") as json_file:
-            flickr_albums = json.load(json_file)
-            for album in flickr_albums["albums"]:
-                self.upload_album(album)
-
+        for album in self.flickr.get_all_albums():
+            self.upload_album(album)
+            
     def upload_album(self, flickr_album):
-        # get or create google album
-        # Add enrichment as description.
-        # Use google album's mediaItemsCount to decide where to resume
-        # for each photo:
-        #   1. upload the cover photo with description and add to album
-        #   2. upload the rest of the photos with description and add to album
         logging.info("Going to upload: '%s'" % flickr_album["title"])
 
         album = self.get_or_create_album(flickr_album)
@@ -146,20 +113,8 @@ class PhotoUploader:
         r = self.session.post("https://photoslibrary.googleapis.com/v1/albums/%s:addEnrichment" % google_album_id, json=enrich_req_body)
         logging.debug("Enrich album response: {}".format(r.text))
 
-    def get_flickr_photo_description(self, photo_id):
-        photo_json_file = os.path.join(self.flickr_photo_json_dir, "photo_%s.json" % photo_id)
-        try:
-            with open(photo_json_file, "r") as json_file:
-                photo_json = json.load(json_file)
-                description = "\n\n".join(filter(len, (photo_json["name"], photo_json["description"])))
-                return description
-        except Exception as err:
-            logging.warn("Could not find photo json file: {}".format(photo_json_file))
-            logging.warn("Exception was: {}".format(err))
-            return None
-
     def upload_photo(self, flickr_photo_id, google_album_id, is_cover_photo):
-        flickr_photo_fspath = self.fs_cache[flickr_photo_id]
+        flickr_photo_fspath = self.flickr.get_photo_fspath(flickr_photo_id)
         logging.info("Uploading photo: '%s: %s'" % (flickr_photo_id, flickr_photo_fspath))
 
         upload_token = None
@@ -177,11 +132,11 @@ class PhotoUploader:
             "albumId": google_album_id,
             "newMediaItems": [
                 {
-                    "description": self.get_flickr_photo_description(flickr_photo_id),
+                    "description": self.flickr.get_photo_description(flickr_photo_id),
                     "simpleMediaItem": {"uploadToken": upload_token}
                 }
             ]}
-        
+
         if is_cover_photo:
             create_request_body["albumPosition"] = {"position": "FIRST_IN_ALBUM"}
 
@@ -189,13 +144,14 @@ class PhotoUploader:
 
 
 def main():
-    # Parse all folders and create a dict of id -> fs path
-    fs_cache = build_fs_cache("c:\\media\\flickr-restore\\test-data")
+    flickr = FlickrHelper("c:\\media\\flickr-restore\\test-data",
+                                        "c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1",
+                                        "c:\\media\\flickr-restore\\test-albums.json")
 
     session = get_authorized_session("c:\\media\\flickr-restore\\credentials.json", "c:\\media\\flickr-restore\\auth-token.json")
 
-    uploader = PhotoUploader("c:\\media\\flickr-restore\\test-albums.json", "c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1",
-                             fs_cache, session)
+    uploader = PhotoUploader(flickr, session)
+    
     uploader.upload_all_albums()
 
 
