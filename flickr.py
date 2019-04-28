@@ -44,13 +44,22 @@ class FlickrHelper:
         return self.fs_cache[photo_id]
 
     def get_photo_description(self, photo_id):
+        photo_json = self.get_photo_json(photo_id)
+        description = "\n\n".join(filter(len, (photo_json["name"], photo_json["description"])))
+        return description
+
+    def get_photo_lat_lon(self, photo_id):
+        photo_json = self.get_photo_json(photo_id)
+        geo = photo_json["geo"]
+        return geo
+
+    def get_photo_json(self, photo_id):
         photo_json_file = os.path.join(self.flickr_photo_json_dir, "photo_%s.json" % photo_id)
         try:
             with open(photo_json_file, "r") as json_file:
                 photo_json = json.load(json_file)
-                description = "\n\n".join(filter(len, (photo_json["name"], photo_json["description"])))
-                return description
+                return photo_json
         except Exception as err:
             logging.warn("Could not find photo json file: {}".format(photo_json_file))
             logging.warn("Exception was: {}".format(err))
-            return None
+            raise err
