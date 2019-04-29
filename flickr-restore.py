@@ -68,7 +68,10 @@ class PhotoUploader:
             cover_photo_id = None
 
         for flickr_photo_id in flickr_album["photos"]:
-            self.upload_photo(flickr_photo_id, album["id"], flickr_photo_id == cover_photo_id)
+            if self.flickr.is_photo_valid(flickr_photo_id):
+                self.upload_photo(flickr_photo_id, album["id"], flickr_photo_id == cover_photo_id)
+            else:
+                logging.warning("Skipping invalid photo id: {}".format(flickr_photo_id))
 
     def get_or_create_album(self, flickr_album):
 
@@ -144,9 +147,13 @@ class PhotoUploader:
 
 
 def main():
-    flickr = FlickrHelper("c:\\media\\flickr-restore\\test-data",
-                                        "c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1",
-                                        "c:\\media\\flickr-restore\\test-albums.json")
+    flickr = FlickrHelper(
+                          #"c:\\media\\flickr-restore\\flickr-photos"
+                          "c:\\media\\flickr-restore\\test-data"
+                          ,"c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1"
+                          #,"c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1\\albums.json" 
+                          ,"c:\\media\\flickr-restore\\test-albums.json"
+                        )
 
     session = get_authorized_session("c:\\media\\flickr-restore\\credentials.json", "c:\\media\\flickr-restore\\auth-token.json")
 
@@ -156,5 +163,17 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        datefmt='%m-%d %H:%M',
+                        filename='flickr-restore.log',
+                        filemode='w')
+
+    # define a Handler which writes INFO messages or higher to the sys.stderr
+    formatter = logging.Formatter('%(levelname)-8s %(message)s')
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
+
     main()

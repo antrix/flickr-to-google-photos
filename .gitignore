@@ -1,6 +1,8 @@
 *.py[cod]
 *$py.class
 
+*.log
+
 venv/
 
 .vscode/*
