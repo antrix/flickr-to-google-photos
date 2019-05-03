@@ -14,6 +14,10 @@ class GeoHelper:
 
         try:
             exif_dict = piexif.load(self.photo_fspath)
+            if exif_dict.get("GPS"):
+                logging.debug("Skipping photo with pre-existing GPS Exif tag: {}".format(self.photo_fspath))
+                return
+            
             exif_dict["GPS"] = _create_gps_tag(latitude, longitude)
             exif_bytes = piexif.dump(exif_dict)
             piexif.insert(exif_bytes, self.photo_fspath)

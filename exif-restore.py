@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import sys
 import logging
 
 from exif import GeoHelper
@@ -12,13 +13,17 @@ class ExifRestorer:
         self.flickr = flickr
 
     def update_all_exif(self):
-        for flickr_album in self.flickr.get_all_albums():
-            logging.info("Going to update exif for all photos in album: '%s'" % flickr_album["title"])
+        albums = self.flickr.get_all_albums()
+        count, total = 1, len(albums)
+        
+        for flickr_album in albums:
+            logging.info("Going to update exif for all photos in album: '{}' [{}/{}]".format(flickr_album["title"], count, total))
             for flickr_photo_id in flickr_album["photos"]:
                 if self.flickr.is_photo_valid(flickr_photo_id):
                     self.update_exif(flickr_photo_id)
                 else:
                     logging.warning("Skipping invalid photo id: {}".format(flickr_photo_id))
+            count += 1
 
     def update_exif(self, flickr_photo_id):
         logging.debug("Going to update exif for photo: '%s'" % flickr_photo_id)
@@ -27,14 +32,12 @@ class ExifRestorer:
             gh = GeoHelper(geo, self.flickr.get_photo_fspath(flickr_photo_id))
             gh.update_geo_exif()
 
-def main():
+def main(config):
     flickr = FlickrHelper(
-                          "c:\\media\\flickr-restore\\flickr-photos"
-                          #"c:\\media\\flickr-restore\\test-data"
-                          ,"c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1"
-                          ,"c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1\\albums.json" 
-                          #,"c:\\media\\flickr-restore\\test-albums.json"
-                        )
+        config["flickr_photo_dir"],
+        config["flickr_photo_json_dir"],
+        config["flickr_albums_json"]
+    )
 
     restorer = ExifRestorer(flickr)    
     restorer.update_all_exif()
@@ -52,5 +55,11 @@ if __name__ == '__main__':
     console.setLevel(logging.INFO)
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
-    
-    main()
+
+    if len(sys.argv) != 2:
+        logging.error("Missing argument: config.json")
+        exit(1)
+
+    with open(sys.argv[1], "r") as f:
+        config = json.load(f)
+        main(config)
