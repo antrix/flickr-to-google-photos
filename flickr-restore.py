@@ -62,6 +62,11 @@ class PhotoUploader:
             logging.error("Failed to create album. Exiting.")
             raise SystemExit
 
+        if int(album.get("mediaItemsCount", 0)) >= int(flickr_album["photo_count"]):
+            logging.info("Skipping upload of album '{}' since item count in Google [{}] is >= item count in Flickr [{}]".format(
+                album["title"], album["mediaItemsCount"], flickr_album["photo_count"]))
+            return
+
         logging.info("Starting upload of photos to: '%s'" % album["title"])
 
         cover_photo_id = flickr_album["cover_photo"].rpartition("/")
@@ -85,7 +90,7 @@ class PhotoUploader:
             logging.debug("Retrieved album list: %s" % albums)
             for album in albums.get("albums", []):
                 if album["title"].lower() == flickr_album["title"].lower():
-                    logging.info("Found existing album: %s" % album)
+                    logging.info("Found existing album: '{}'".format(album["title"]))
                     return album
 
             if 'nextPageToken' in albums:
