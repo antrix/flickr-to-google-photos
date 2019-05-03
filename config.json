@@ -1,5 +1,8 @@
 {
     "flickr_photo_dir": "c:\\media\\flickr-restore\\flickr-photos",
     "flickr_photo_json_dir": "c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1",
-    "flickr_albums_json": "c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1\\albums.json"
+    "flickr_albums_json": "c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1\\albums.json",
+
+    "client_secrets_file": "c:\\media\\flickr-restore\\credentials.json",
+    "auth_token_file": "c:\\media\\flickr-restore\\auth-token.json"
 }

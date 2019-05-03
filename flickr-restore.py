@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import sys
 import logging
 
 from google.auth.transport.requests import AuthorizedSession
@@ -47,12 +48,14 @@ class PhotoUploader:
         self.session = session
 
     def upload_all_albums(self):
-        for album in self.flickr.get_all_albums():
+        albums = self.flickr.get_all_albums()
+        count, total = 1, len(albums)
+        for album in albums:
+            logging.info("Going to upload: '{}' [{}/{}]".format(album["title"], count, total))
             self.upload_album(album)
+            count += 1
             
     def upload_album(self, flickr_album):
-        logging.info("Going to upload: '%s'" % flickr_album["title"])
-
         album = self.get_or_create_album(flickr_album)
 
         if not album or not album["title"]:
@@ -60,7 +63,7 @@ class PhotoUploader:
             raise SystemExit
 
         logging.info("Starting upload of photos to: '%s'" % album["title"])
-        
+
         cover_photo_id = flickr_album["cover_photo"].rpartition("/")
         if cover_photo_id[1] == "/":
             cover_photo_id = cover_photo_id[2]
@@ -82,7 +85,7 @@ class PhotoUploader:
             logging.debug("Retrieved album list: %s" % albums)
             for album in albums.get("albums", []):
                 if album["title"].lower() == flickr_album["title"].lower():
-                    logging.debug("Found existing album: %s" % album)
+                    logging.info("Found existing album: %s" % album)
                     return album
 
             if 'nextPageToken' in albums:
@@ -146,19 +149,19 @@ class PhotoUploader:
         self.session.post("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", json=create_request_body).raise_for_status()
 
 
-def main():
+def main(config):
     flickr = FlickrHelper(
-                          #"c:\\media\\flickr-restore\\flickr-photos"
-                          "c:\\media\\flickr-restore\\test-data"
-                          ,"c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1"
-                          #,"c:\\media\\flickr-restore\\72157698068208210_90be50b743b6_part1\\albums.json" 
-                          ,"c:\\media\\flickr-restore\\test-albums.json"
-                        )
+        config["flickr_photo_dir"],
+        config["flickr_photo_json_dir"],
+        config["flickr_albums_json"]
+    )
 
-    session = get_authorized_session("c:\\media\\flickr-restore\\credentials.json", "c:\\media\\flickr-restore\\auth-token.json")
+    session = get_authorized_session(
+        config["client_secrets_file"],
+        config["auth_token_file"]
+    )
 
     uploader = PhotoUploader(flickr, session)
-    
     uploader.upload_all_albums()
 
 
@@ -176,4 +179,10 @@ if __name__ == '__main__':
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
 
-    main()
+    if len(sys.argv) != 2:
+        logging.error("Missing argument: config.json")
+        exit(1)
+
+    with open(sys.argv[1], "r") as f:
+        config = json.load(f)
+        main(config)
